@@ -1,0 +1,28 @@
+# Données : regénérées par le pipeline (et trop volumineuses pour Git)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Logs : produits à chaque exécution
+logs/*
+!logs/.gitkeep
+
+# Secrets : ne jamais commiter
+.env
+.env.example
+*.json
+!references/*.json
+
+# Python / environnement
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Notes de travail personnelles (consignes pour Claude, planning)
+CLAUDE.md
+sources-et-plan.md

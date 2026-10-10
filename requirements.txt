@@ -1,0 +1,25 @@
+# Pipeline de données
+pandas
+pyarrow
+duckdb
+requests
+python-dotenv
+google-cloud-bigquery
+db-dtypes
+
+# API
+fastapi
+uvicorn
+
+# Dashboard
+streamlit
+plotly
+numpy
+pillow
+
+# Notebook d'exploration
+jupyter
+matplotlib
+seaborn
+scipy
+ipywidgets
