@@ -1,0 +1,17 @@
+comparia_model,hf_model_id,match_type,comment
+apertus-70b-instruct-2509,swiss-ai/Apertus-70B-Instruct-2509,exact,
+apertus-8b-instruct-2509,swiss-ai/Apertus-8B-Instruct-2509,exact,seulement 155 conversations (< seuil de 200)
+deepseek-r1-distill-llama-70b,deepseek-ai/DeepSeek-R1-Distill-Llama-70B,exact,
+glm-4.5,zai-org/GLM-4.5,exact,
+glm-4.6,zai-org/GLM-4.6,exact,
+gpt-oss-120b,openai/gpt-oss-120b,exact,mesuré uniquement en tâche reasoning (3 niveaux)
+gpt-oss-20b,openai/gpt-oss-20b,exact,mesuré uniquement en tâche reasoning (3 niveaux)
+ministral-8b-instruct-2410,mistralai/Ministral-8B-Instruct-2410,exact,pas d'énergie côté ComparIA : inutilisable pour estimé vs mesuré
+phi-4,microsoft/phi-4,exact,
+qwen3-30b-a3b,Qwen/Qwen3-30B-A3B,exact,
+mistral-nemo-2407,mistralai/Mistral-Nemo-Instruct-2407,nom_different,même modèle instruct : seul le nommage diffère
+gemma-3-27b,google/gemma-3-27b-pt,version_base,AIES mesure la version de base (pt) ; ComparIA sert la version instruct (même architecture)
+gemma-3-4b,google/gemma-3-4b-pt,version_base,AIES mesure la version de base (pt) ; ComparIA sert la version instruct (même architecture)
+llama-3.1-8b,meta-llama/Meta-Llama-3.1-8B,version_base,AIES mesure la version de base ; ComparIA sert la version instruct (même architecture)
+mixtral-8x7b-instruct-v0.1,mistralai/Mixtral-8x7B-v0.1,version_base,AIES mesure la version de base ; ComparIA sert la version instruct (même architecture)
+yi-1.5-9b-chat,01-ai/Yi-1.5-9B,version_base,AIES mesure la version de base ; ComparIA sert la version chat ; seulement 129 conversations (< seuil de 200)

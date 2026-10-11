@@ -51,10 +51,14 @@ VOTES_QUERY = f"""
 
 def collect_comparia(query, output_path):
     """Exécute une requête DuckDB sur un parquet distant et sauvegarde le résultat."""
-    # Idempotence : si le fichier existe déjà, on ne relance pas la collecte
+    # Idempotence : on ne retélécharge pas un fichier récent,
+    # mais on le rafraîchit après MAX_FILE_AGE_DAYS jours (ComparIA est mis à jour chaque mois)
     if output_path.exists():
-        logging.info(f"{output_path.name} déjà présent, collecte ignorée")
-        return
+        age_days = (time.time() - output_path.stat().st_mtime) / 86400
+        if age_days < config.MAX_FILE_AGE_DAYS:
+            logging.info(f"{output_path.name} déjà présent ({age_days:.0f} jours), collecte ignorée")
+            return
+        logging.info(f"{output_path.name} a {age_days:.0f} jours, nouvelle collecte")
 
     for attempt in range(1, config.MAX_RETRIES + 1):
         try:
@@ -76,16 +80,21 @@ def collect_comparia(query, output_path):
 
 def collect_csv(url, output_path):
     """Télécharge un CSV AI Energy Score tel quel (les anomalies sont traitées dans clean.py)."""
+    # Même règle d'idempotence que pour ComparIA
     if output_path.exists():
-        logging.info(f"{output_path.name} déjà présent, collecte ignorée")
-        return
+        age_days = (time.time() - output_path.stat().st_mtime) / 86400
+        if age_days < config.MAX_FILE_AGE_DAYS:
+            logging.info(f"{output_path.name} déjà présent ({age_days:.0f} jours), collecte ignorée")
+            return
+        logging.info(f"{output_path.name} a {age_days:.0f} jours, nouvelle collecte")
 
     for attempt in range(1, config.MAX_RETRIES + 1):
         try:
             response = requests.get(url, timeout=60)
             response.raise_for_status()  # déclenche une erreur si le serveur répond 404, 500…
             output_path.write_bytes(response.content)
-            nb_lines = response.text.count("\n") - 1  # -1 pour la ligne d'en-tête
+            # splitlines() compte aussi la dernière ligne quand le fichier ne finit pas par un retour à la ligne
+            nb_lines = len(response.text.splitlines()) - 1  # -1 pour la ligne d'en-tête
             logging.info(f"{output_path.name} : {nb_lines} lignes collectées")
             return
         except Exception as error:

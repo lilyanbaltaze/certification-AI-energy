@@ -27,6 +27,8 @@ AIES_REASONING_URL = "https://huggingface.co/spaces/AIEnergyScore/Leaderboard/re
 # on réessaie donc plusieurs fois avant d'abandonner.
 MAX_RETRIES = 3
 RETRY_WAIT_SECONDS = 10
+# Un fichier local plus vieux que ça est retéléchargé : ComparIA est mis à jour chaque mois
+MAX_FILE_AGE_DAYS = 30
 
 # Seuils d'analyse repris du notebook (à réexaminer sur les données complètes)
 MIN_DUELS = 200
