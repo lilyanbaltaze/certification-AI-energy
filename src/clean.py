@@ -66,6 +66,11 @@ def clean_conversations(conv):
     empty = categories["category"].isna() | (categories["category"] == "")
     logging.info(f"catégories : {empty.sum()} catégories vides retirées")
     categories = categories[~empty]
+    # Certaines conversations citent deux fois la même catégorie : doublon sans information,
+    # et le couple (conversation, catégorie) est la clé primaire de la table → on le retire
+    duplicates = categories.duplicated()
+    logging.info(f"catégories : {duplicates.sum()} doublons (même catégorie citée deux fois) retirés")
+    categories = categories[~duplicates]
     logging.info(f"catégories : {len(categories)} lignes, {categories['category'].nunique()} catégories distinctes")
 
     # Les nombres de paramètres décrivent le modèle, pas la conversation : ils iront dans la table models
@@ -131,6 +136,10 @@ def clean_aies(path, task):
     aies["hf_model_id"] = split[0]
     aies["reasoning_level"] = split[1] if split.shape[1] > 1 else None
     logging.info(f"{path.name} : {aies['reasoning_level'].notna().sum()} niveaux de raisonnement séparés du nom")
+    # Sans niveau précisé, le modèle a été testé dans sa configuration par défaut (méthodologie AIES).
+    # On écrit "default" plutôt que de laisser vide : cette colonne fait partie de la clé primaire,
+    # et une clé ne peut pas contenir de valeur vide.
+    aies["reasoning_level"] = aies["reasoning_level"].fillna("default")
 
     # Dates au format "Feb 25" en vraie date (1er du mois), triable et comparable
     aies["test_date"] = pd.to_datetime(aies["test date"], format="%b %y").dt.date
@@ -147,9 +156,8 @@ def clean_aies(path, task):
     return energy
 
 
-def build_models(conv, votes, mapping):
-    """Construit la table models : une ligne par modèle, avec fournisseur, paramètres
-    et identifiant Hugging Face (lien vers AI Energy Score)."""
+def build_models(conv, votes):
+    """Construit la table models : une ligne par modèle, avec fournisseur et paramètres."""
     # Paramètres : on empile les côtés a et b (même méthode que dans mon notebook pour l'énergie)
     side_a = conv[["model_a_name", "model_a_total_params", "model_a_active_params"]]
     side_a.columns = ["model_name", "total_params", "active_params"]
@@ -168,13 +176,20 @@ def build_models(conv, votes, mapping):
     others = models.loc[models["provider"] == "Autre", "model_name"].tolist()
     logging.info(f"models : {len(others)} modèles sans fournisseur reconnu (« Autre ») : {', '.join(others)}")
 
-    # Lien avec AI Energy Score via la table de correspondance écrite à la main
-    models = models.merge(mapping[["comparia_model", "hf_model_id", "match_type"]],
-                          left_on="model_name", right_on="comparia_model", how="left")
-    models = models.drop(columns="comparia_model")
-
-    logging.info(f"models : {len(models)} modèles, dont {models['hf_model_id'].notna().sum()} appariés avec AI Energy Score")
+    logging.info(f"models : {len(models)} modèles")
     return models
+
+
+def link_energy_to_models(energy, mapping):
+    """Ajoute à chaque mesure AI Energy Score le nom du modèle ComparIA correspondant
+    (vide si le modèle n'existe pas dans ComparIA), d'après la table de correspondance.
+    Le lien est rangé ici et non dans models : dans le MCD, une mesure concerne 0 ou 1 modèle
+    (cardinalité 0,1), donc la clé étrangère va du côté de la mesure."""
+    mapping = mapping.rename(columns={"comparia_model": "model_name"})
+    energy = energy.merge(mapping[["hf_model_id", "model_name", "match_type"]], on="hf_model_id", how="left")
+    linked = energy["model_name"].notna()
+    logging.info(f"energy_measures : {linked.sum()} mesures reliées à {energy.loc[linked, 'model_name'].nunique()} modèles ComparIA")
+    return energy
 
 
 def check_mapping(mapping, models, energy):
@@ -207,8 +222,9 @@ def run_clean():
     # Les paramètres viennent des conversations brutes (noms déjà normalisés par clean_conversations)
     conv_raw["model_a_name"] = normalize_model_name(conv_raw["model_a_name"])
     conv_raw["model_b_name"] = normalize_model_name(conv_raw["model_b_name"])
-    models = build_models(conv_raw, votes, mapping)
+    models = build_models(conv_raw, votes)
     check_mapping(mapping, models, energy)
+    energy = link_energy_to_models(energy, mapping)
 
     # Parquet : garde les types (dates, booléens) et se charge directement dans BigQuery
     models.to_parquet(out / "models.parquet", index=False)

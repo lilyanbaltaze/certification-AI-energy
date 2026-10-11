@@ -1,0 +1,23 @@
+CATEGORIE: category
+APPARTENIR, 0N CONVERSATION, 1N CATEGORIE
+CONVERSATION: conversation_pair_id, timestamp, conv_turns, total_conv_a_kwh, total_conv_b_kwh, total_conv_a_output_tokens, total_conv_b_output_tokens
+:
+:
+
+:
+OPPOSER_A, 11 CONVERSATION, 0N MODELE
+OPPOSER_B, 11 CONVERSATION, 0N MODELE
+:
+GAGNER, 01 VOTE, 0N MODELE
+
+MESURE_ENERGIE: hf_model_id, _task, _reasoning_level, gpu_energy_wh, energy_score, size_class, test_date
+MESURER, 01 MESURE_ENERGIE, 0N MODELE: match_type
+MODELE: model_name, provider, total_params, active_params
+COMPARER_A, 11 VOTE, 0N MODELE
+VOTE: conversation_pair_id, timestamp, both_equal
+
+:
+:
+:
+COMPARER_B, 11 VOTE, 0N MODELE
+:

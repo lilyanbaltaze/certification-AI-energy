@@ -26,3 +26,9 @@ __pycache__/
 # Notes de travail personnelles (consignes pour Claude, planning)
 CLAUDE.md
 sources-et-plan.md
+
+# Anciens résultats du projet de groupe (comparaison uniquement)
+data/legacy/
+
+# Modèles de documents d'autres personnes (non publiés)
+ressources/
