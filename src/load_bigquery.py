@@ -1,8 +1,9 @@
-"""Étape 3 du pipeline : chargement de la couche silver dans BigQuery (compétence C4).
+"""Étape 3 du pipeline : chargement dans BigQuery (compétences C4 et C3).
 
 1. crée les tables avec sql/create_tables.sql (le modèle physique) ;
-2. charge les 5 fichiers parquet de data/processed/ ;
-3. vérifie que BigQuery contient autant de lignes que les fichiers locaux.
+2. charge les 5 fichiers parquet de data/processed/ (couche silver) ;
+3. vérifie que BigQuery contient autant de lignes que les fichiers locaux ;
+4. crée les vues de la couche gold (sql/queries/), qui agrègent la couche silver.
 
 Relancer le script ne crée jamais de doublons : les tables sont recréées vides à chaque fois.
 """
@@ -70,12 +71,29 @@ def load_table(client, name):
     logging.info(f"BigQuery : {name} chargée ({bq_rows} lignes, identique au fichier local)")
 
 
+# Ordre imposé : gold_ranking_per_cat et gold_estime_vs_mesure lisent gold_energy_global
+GOLD_VIEWS = ["gold_classement_score_ajuste", "gold_energy_global",
+              "gold_ranking_per_cat", "gold_estime_vs_mesure"]
+
+
+def create_gold_views(client):
+    """Crée (ou remplace) les vues de la couche gold.
+    Une vue est une requête enregistrée : BigQuery la recalcule à chaque lecture,
+    elle est donc toujours à jour avec la couche silver, sans copie des données."""
+    for name in GOLD_VIEWS:
+        sql = (config.ROOT_DIR / "sql" / "queries" / f"{name}.sql").read_text(encoding="utf-8")
+        client.query(sql).result()
+        rows = client.query(f"SELECT COUNT(*) AS n FROM {config.BQ_DATASET}.{name}").result()
+        logging.info(f"BigQuery : vue {name} créée ({next(iter(rows)).n} lignes)")
+
+
 def run_load():
     """Lance tout le chargement (appelée par main.py) : silver local → BigQuery."""
     client = bigquery.Client(project=config.GCP_PROJECT)
     create_tables(client)
     for name in PRIMARY_KEYS:
         load_table(client, name)
+    create_gold_views(client)
 
 
 if __name__ == "__main__":

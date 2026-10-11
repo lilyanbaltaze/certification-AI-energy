@@ -16,6 +16,7 @@ LOGS_DIR = ROOT_DIR / "logs"
 load_dotenv(ROOT_DIR / ".env")
 GCP_PROJECT = os.getenv("GCP_PROJECT")
 BQ_DATASET = os.getenv("BQ_DATASET", "ai_energy")
+API_KEY = os.getenv("API_KEY")  # clé exigée par l'API (en-tête X-API-Key)
 
 # Sources
 COMPARIA_CONVERSATIONS_URL = "https://ministere-culture.s3.sbg.io.cloud.ovh.net/COMPARIA/conversations.parquet"
