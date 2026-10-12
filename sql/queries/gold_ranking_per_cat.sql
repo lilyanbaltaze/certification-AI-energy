@@ -1,6 +1,6 @@
--- Couche gold : modèles par catégorie de conversation (méthode du notebook).
--- Mêmes colonnes que l'ancien ranking_per_cat.csv (dont le nom « categories »).
--- Le seuil de 30 conversations par modèle et par catégorie est appliqué par l'API.
+-- Couche gold : modèles par catégorie de conversation (méthode de mon notebook).
+-- Mêmes colonnes que mon fichier ranking_per_cat.csv (dont le nom « categories »).
+-- Le seuil de 30 conversations par modèle et par catégorie est appliqué plus tard via l'API.
 CREATE OR REPLACE VIEW ai_energy.gold_ranking_per_cat AS
 WITH model_categories AS (
     -- Une ligne par (modèle, catégorie, conversation) : côtés A et B empilés
@@ -19,7 +19,7 @@ counts AS (
 )
 SELECT
     counts.model,
-    counts.category AS categories,
+    counts.category AS categories, -- renommé avec le même nom qu'utilisé dans le dashboard
     counts.nb_conv_cat,
     energy.mwh_per_token,
     energy.avg_kwh,

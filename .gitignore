@@ -32,3 +32,6 @@ data/legacy/
 
 # Modèles de documents d'autres personnes (non publiés)
 ressources/
+
+# Export personnel de la conversation avec l'assistant (non publié)
+conversation-claude-code.txt

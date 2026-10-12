@@ -7,7 +7,7 @@ CREATE OR REPLACE VIEW ai_energy.gold_classement_score_ajuste AS
 WITH participations AS (
     -- Chaque vote compte pour les deux modèles du duel : on empile le côté A et le côté B
     SELECT model_a_name AS model, chosen_model_name, both_equal FROM ai_energy.votes
-    UNION ALL
+    UNION ALL -- équivalent d'un pd.concat, on va coller les resultats l'un sous l'autre en gardant toutes les lignes (ALL)
     SELECT model_b_name AS model, chosen_model_name, both_equal FROM ai_energy.votes
 ),
 model_points AS (

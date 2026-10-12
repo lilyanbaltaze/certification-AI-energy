@@ -12,7 +12,7 @@ SELECT
     e.reasoning_level,
     e.size_class,
     e.gpu_energy_wh,                        -- MESURÉ : Wh GPU par requête (H100)
-    g.avg_kwh_per_req * 1000 AS comparia_wh_per_req,   -- ESTIMÉ : Wh par requête
+    g.avg_kwh_per_req * 1000 AS comparia_wh_per_req,   -- ESTIMÉ : Wh par requête / *1000 pour convertir KWh de ComparIA en Wh de AI Energy SCore
     g.mwh_per_token AS comparia_mwh_per_token,          -- ESTIMÉ : coefficient par token
     g.nb_conversations
 FROM ai_energy.energy_measures AS e
