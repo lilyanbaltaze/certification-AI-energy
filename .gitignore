@@ -35,3 +35,6 @@ ressources/
 
 # Export personnel de la conversation avec l'assistant (non publié)
 conversation-claude-code.txt
+
+# Captures d'écran (intégrées au rapport, non publiées)
+captures/

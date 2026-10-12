@@ -33,6 +33,9 @@ PROVIDER_COLORS = {
     "Anthropic": "#CC785C", "OpenAI": "#10A37F", "MiniMax": "#6C5CE7",
     "Microsoft": "#00A4EF", "EuroLLM": "#3D9970", "Allen AI": "#E84393",
     "NousResearch": "#F7B731", "Cohere": "#D4A017", "Autre": "#AAAAAA",
+    # Fournisseurs absents de l'échantillon du notebook, présents dans les données complètes
+    "Swiss AI": "#D52B1E", "Liquid AI": "#6E56CF", "AI21 Labs": "#E8590C",
+    "Arcee AI": "#0F766E", "01.AI": "#495057", "Jpacifico": "#8B5E3C",
 }
 
 LOGO_URLS = {
@@ -76,6 +79,14 @@ def get_provider(model: str) -> str:
     if m.startswith("phi"):                                         return "Microsoft"
     if m.startswith("eurollm"):                                     return "EuroLLM"
     if m.startswith("olmo"):                                        return "Allen AI"
+    # Mêmes règles que src/clean.py (ajoutées le 11/10 pour les données complètes)
+    if m.startswith(("aya", "c4ai", "command")):                    return "Cohere"
+    if m.startswith("apertus"):                                     return "Swiss AI"
+    if m.startswith("lfm"):                                         return "Liquid AI"
+    if m.startswith("jamba"):                                       return "AI21 Labs"
+    if m.startswith("trinity"):                                     return "Arcee AI"
+    if m.startswith("yi-"):                                         return "01.AI"
+    if m.startswith("chocolatine"):                                 return "Jpacifico"
     return "Autre"
 
 
@@ -146,6 +157,34 @@ def load_data():
 
 classement, energy_g, merged, ranking_cat, nb_conv, nb_models_score, nb_models_energy, top_model = load_data()
 
+# Affichage en Wh plutôt qu'en kWh : « 0,031 Wh » se lit mieux que « 3.08e-05 kWh » (1 kWh = 1 000 Wh).
+for _df in (energy_g, merged, ranking_cat):
+    _df["wh_conv"] = _df["avg_kwh"] * 1000
+    _df["wh_req"] = _df["avg_kwh_per_req"] * 1000
+
+
+def fmt_value(value):
+    """Écrit une valeur d'énergie sans notation scientifique, avec un nombre de décimales adapté."""
+    if value >= 10:
+        return f"{value:.1f}"
+    if value >= 1:
+        return f"{value:.2f}"
+    return f"{value:.3f}"
+
+
+
+@st.cache_data
+def load_measures():
+    """Énergie MESURÉE (AI Energy Score) croisée avec l'énergie estimée (ComparIA), et volumes en base."""
+    measures = fetch("/estimated-vs-measured")  # tâche text_generation par défaut
+    health = requests.get(f"{API_URL}/health", timeout=60).json()  # endpoint public
+    return measures, health
+
+
+measures, health = load_measures()
+# Modèles comparables : énergie ComparIA disponible et au moins 200 conversations (mêmes règles que l'analyse)
+comparable = measures[measures["comparia_wh_per_req"].notna() & (measures["nb_conversations"] >= 200)].copy()
+
 
 def _fetch_logo(prov_url):
     prov, url = prov_url
@@ -178,7 +217,10 @@ st.title("Comparaison entre différents modèles d'IA")
 st.caption("Source : ComparIA (ministère de la Culture) — votes et conversations en duel, lus via l'API du projet. "
            "Textes mis à jour sur la collecte du 12/10/2026 (conversations du 01/10/2024 au 18/05/2026).")
 
-with st.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
+# Les deux encadrés de présentation des sources, côte à côte
+_info_left, _info_right = st.columns(2)
+
+with _info_left.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
     st.markdown("""
     **ComparIA** est une plateforme publique qui invite les utilisateurs à comparer des modèles d'IA en conditions réelles.
     À chaque session, **le même message est envoyé simultanément à deux modèles différents** — un duel.
@@ -218,10 +260,20 @@ with st.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
             unsafe_allow_html=True,
         )
 
-    st.markdown("---")
-    st.markdown("""
-    💬 **410 016 conversations** &nbsp;·&nbsp; 🗳️ **149 209 votes** publiés par ComparIA
-    (du 01/10/2024 au 18/05/2026, avant nettoyage)
+
+with _info_right.expander("ℹ️ Qu'est-ce qu'AI Energy Score ?", expanded=False):
+    st.markdown(f"""
+    **AI Energy Score** est un classement publié par **Hugging Face** qui **mesure** l'énergie réellement consommée
+    par des modèles d'IA, dans les mêmes conditions pour tous :
+    - un même processeur graphique (**GPU NVIDIA H100**), une requête à la fois ;
+    - **1 000 requêtes** par tâche (génération de texte, raisonnement…) ;
+    - seule l'énergie du GPU est comptée, exprimée en **Wh par requête** ;
+    - une note de **1 à 5 étoiles**, relative à la classe de taille du modèle
+      (A : moins de 20 milliards de paramètres, B : de 20 à 66, C : plus de 66).
+
+    Seuls les modèles **open-weight** (dont les poids sont publics) peuvent être mesurés : GPT, Claude ou Gemini n'y figurent pas.
+    Ce dashboard s'en sert pour **vérifier les estimations de ComparIA** sur les {len(comparable)} modèles présents
+    dans les deux sources (section « 🔬 Estimé vs mesuré »).
     """)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -237,8 +289,8 @@ _CARD = "border:1px solid #e8e8e8;border-radius:10px;padding:16px;text-align:cen
 
 c1.markdown(f"""
     <div style="{_CARD}">
-        <div style="font-size:11px;color:#888;margin-bottom:8px;">💬 CONVERSATIONS ANALYSÉES</div>
-        <div style="font-size:50px;font-weight:700;margin:6px 0;">{nb_conv:,}</div>
+        <div style="font-size:11px;color:#888;margin-bottom:8px;">💬 CONVERSATIONS EN BASE</div>
+        <div style="font-size:50px;font-weight:700;margin:6px 0;">{health["nb_conversations"]:,}</div>
     </div>
 """, unsafe_allow_html=True)
 
@@ -394,8 +446,8 @@ with st.expander("📐 Méthodologie — Consommation énergétique", expanded=F
     """)
 
 CRITERIA = {
-    "💬 Par conversation":  ("avg_kwh",         "kWh / conversation"),
-    "📨 Par requête":       ("avg_kwh_per_req",  "kWh / requête"),
+    "💬 Par conversation":  ("wh_conv",          "Wh / conversation"),
+    "📨 Par requête":       ("wh_req",           "Wh / requête"),
     "🔬 Par token généré":  ("mwh_per_token",    "mWh / token"),
 }
 
@@ -427,7 +479,7 @@ with col_left:
     medals = ["🥇", "🥈", "🥉"]
     for rank, (_, row) in enumerate(energy_sorted.head(3).iterrows()):
         val = row[col_name]
-        val_str = f"{val:.4f}" if val >= 0.0001 else f"{val:.2e}"
+        val_str = fmt_value(val)
         st.markdown(
             f"""
             <div style="padding:10px 4px;border-bottom:1px solid #f0f0f0;text-align:center;">
@@ -456,12 +508,10 @@ with col_right:
         customdata=energy_sorted[["provider", col_name]].values,
         hovertemplate=(
             "<b>%{y}</b><br>"
-            f"{col_label} : %{{x:.5f}}<br>"
+            f"{col_label} : %{{x:.3f}}<br>"
             "Provider : %{customdata[0]}<extra></extra>"
         ),
-        text=energy_sorted[col_name].map(
-            lambda v: f"{v:.4f}" if v >= 0.0001 else f"{v:.2e}"
-        ),
+        text=energy_sorted[col_name].map(fmt_value),
         textposition="outside",
     ))
     fig_energy.update_layout(
@@ -479,7 +529,7 @@ with col_right:
 st.markdown("""
 **Key insights**
 - 💡 Les plus sobres **par token** (~0,08 mWh) sont de petits modèles ou des modèles à experts : *lfm2*, *gpt-oss-20b*, *qwen3-30b-a3b*, *gpt-5-nano*, *gemma-3-4b*
-- 📊 **Par conversation**, l'écart est énorme : de 0,00003 kWh (*chocolatine*) à 0,15 kWh (*grok-4.20*), pour une médiane de 0,0009 kWh
+- 📊 **Par conversation**, l'écart est énorme : de 0,03 Wh (*chocolatine*) à 150 Wh (*grok-4.20*), pour une médiane de 0,9 Wh
 - ⚠️ Les modèles de raisonnement consomment beaucoup plus par conversation (*deepseek-r1* 5×, *kimi-k2-thinking* 8× la médiane) pour des scores proches de la moyenne (54 % et 51 %, moyenne 49 %)
 - 🔎 Ces valeurs sont des **estimations** de ComparIA (tokens × coefficient par modèle) : le classement par token reflète ce coefficient, pas une mesure
 """)
@@ -514,8 +564,13 @@ _pareto_knee["_knee"] = (
 )
 champion_efficience = _pareto_knee.loc[_pareto_knee["_knee"].idxmax()]
 
-# Champion ratio : meilleur score / kWh par conversation (cohérent avec l'axe Y du graphique)
-champion_ratio = merged.loc[merged["score_par_kwh"].idxmax()]
+# 3e champion : le plus sobre PAR TOKEN parmi les modèles de bonne qualité.
+# Remplace l'ancien « meilleur ratio score / kWh », qui désignait un modèle très sobre mais faible (29 % de score).
+# Seuil de 55 % : nettement au-dessus de la moyenne des modèles (~49 %). Le critère par token ne dépend pas
+# de la longueur des réponses : il compare l'efficience des modèles eux-mêmes (comme dans le notebook d'origine).
+QUALITY_THRESHOLD = 55
+good_models = merged[merged["score"] >= QUALITY_THRESHOLD]
+champion_sobre = good_models.loc[good_models["mwh_per_token"].idxmin()]
 
 col_chart, col_rank = st.columns([6, 4])
 
@@ -524,23 +579,23 @@ with col_chart:
 
     # Tous les modèles (gris)
     fig_pareto.add_trace(go.Scatter(
-        x=merged["score"], y=merged["avg_kwh"],
+        x=merged["score"], y=merged["wh_conv"],
         mode="markers",
         marker=dict(color="#CCCCCC", size=7),
         text=merged["model"],
-        hovertemplate="<b>%{text}</b><br>Score : %{x:.1f}%<br>kWh/conv : %{y:.5f}<extra></extra>",
+        hovertemplate="<b>%{text}</b><br>Score : %{x:.1f}%<br>Wh/conversation : %{y:.3f}<extra></extra>",
         name="Autres modèles",
         showlegend=True,
     ))
 
     # Frontière de Pareto
     fig_pareto.add_trace(go.Scatter(
-        x=pareto["score"], y=pareto["avg_kwh"],
+        x=pareto["score"], y=pareto["wh_conv"],
         mode="lines+markers",
         line=dict(color="#333", dash="dash", width=1.5),
         marker=dict(color="#333", size=7),
         name="Frontière de Pareto",
-        hovertemplate="<b>%{text}</b><br>Score : %{x:.1f}%<br>kWh : %{y:.5f}<extra></extra>",
+        hovertemplate="<b>%{text}</b><br>Score : %{x:.1f}%<br>Wh/conversation : %{y:.3f}<extra></extra>",
         text=pareto["model"],
     ))
 
@@ -548,11 +603,11 @@ with col_chart:
     for key, champ, label in [
         ("qualite",    champion_qualite,    "Meilleure qualité"),
         ("efficience", champion_efficience, "Meilleur rapport qualité/énergie"),
-        ("token",      champion_ratio,      "Meilleur ratio score/consommation"),
+        ("token",      champion_sobre,      f"Le plus sobre par token (score ≥ {QUALITY_THRESHOLD} %)"),
     ]:
         color = CHAMPION_COLORS[key]
         fig_pareto.add_trace(go.Scatter(
-            x=[champ["score"]], y=[champ["avg_kwh"]],
+            x=[champ["score"]], y=[champ["wh_conv"]],
             mode="markers+text",
             marker=dict(color=color, size=14, line=dict(color="white", width=2)),
             text=[champ["model"].split("-")[0]],
@@ -560,7 +615,7 @@ with col_chart:
             textfont=dict(color=color, size=10),
             name=label,
             customdata=[[champ["model"], label]],
-            hovertemplate=f"<b>%{{customdata[0]}}</b><br>{label}<br>Score : %{{x:.1f}}%<br>kWh : %{{y:.5f}}<extra></extra>",
+            hovertemplate=f"<b>%{{customdata[0]}}</b><br>{label}<br>Score : %{{x:.1f}}%<br>Wh/conversation : %{{y:.3f}}<extra></extra>",
         ))
 
     # Ligne verticale : gemini-2.0-flash (meilleur score), affichée seulement s'il n'a pas de données énergie.
@@ -587,12 +642,21 @@ with col_chart:
             borderpad=3,
         )
 
+    # Seuil de « bonne qualité » utilisé par le 3e champion : ligne verticale pour situer la zone concernée
+    fig_pareto.add_vline(
+        x=QUALITY_THRESHOLD,
+        line=dict(color="#E9C46A", dash="dot", width=1.5),
+        annotation_text=f"seuil de bonne qualité ({QUALITY_THRESHOLD} %)",
+        annotation_position="bottom right",
+        annotation_font=dict(size=9, color="#B8962E"),
+    )
+
     _x_max = max(merged["score"].max(), float(_g2_score.iloc[0]) if not _g2_score.empty else 0) + 2
 
     fig_pareto.update_layout(
         title="Performance vs consommation énergétique<br><sup>La frontière de Pareto identifie les modèles non dominés</sup>",
         xaxis=dict(title="Score ajusté (%)", range=[merged["score"].min() - 2, _x_max]),
-        yaxis_title="kWh / conversation (log)",
+        yaxis_title="Wh / conversation (échelle log)",
         yaxis_type="log",
         height=520,
         plot_bgcolor="white",
@@ -615,12 +679,13 @@ with col_rank:
         ),
         (
             champion_efficience, "efficience", "⚡ Meilleur compromis qualité / énergie",
-            f"Score normalisé ({_eff_s_norm:.2f}) - kWh normalisé ({_eff_k_norm:.2f}) = {_eff_s_norm - _eff_k_norm:.2f} — maximum sur la frontière de Pareto.",
+            f"Score normalisé ({_eff_s_norm:.2f}) − énergie normalisée ({_eff_k_norm:.2f}) = {_eff_s_norm - _eff_k_norm:.2f} — maximum sur la frontière de Pareto.",
             None,
         ),
         (
-            champion_ratio, "token", "📊 Meilleur ratio score / consommation",
-            f"{champion_ratio['score']:.1f}% / {champion_ratio['avg_kwh']:.5f} kWh = {champion_ratio['score_par_kwh']:,.0f} pts/kWh — ratio le plus élevé parmi les {_n_energy} modèles.",
+            champion_sobre, "token", f"🔬 Le plus sobre par token (score ≥ {QUALITY_THRESHOLD} %)",
+            f"{fmt_value(champion_sobre['mwh_per_token'])} mWh par token : la plus faible consommation par token parmi les "
+            f"{len(good_models)} modèles ayant au moins {QUALITY_THRESHOLD} % de score.",
             None,
         ),
     ]
@@ -644,8 +709,8 @@ with col_rank:
             f'<div style="display:flex;gap:12px;margin-bottom:7px;">'
             f'<div><div style="font-size:9px;color:#aaa;">SCORE</div>'
             f'<div style="font-weight:700;font-size:15px;color:{color};">{champ["score"]:.1f}%</div></div>'
-            f'<div><div style="font-size:9px;color:#aaa;">kWh/CONV</div>'
-            f'<div style="font-weight:700;font-size:15px;color:{color};">{champ["avg_kwh"]:.4f}</div></div>'
+            f'<div><div style="font-size:9px;color:#aaa;">Wh/CONV</div>'
+            f'<div style="font-weight:700;font-size:15px;color:{color};">{fmt_value(champ["wh_conv"])}</div></div>'
             f'</div>'
             f'<div style="font-size:10px;color:#666;line-height:1.5;">{reason}</div>'
             + '</div></div></div>',
@@ -661,14 +726,27 @@ with st.expander("📐 Méthodologie — Synthèse Pareto", expanded=False):
     Les **3 champions** sont sélectionnés selon des critères distincts :
     - 🏆 **Meilleure qualité** — score ajusté le plus élevé parmi les modèles avec données énergétiques
     - ⚡ **Meilleur compromis** — point de coude de la frontière de Pareto : score normalisé − kWh normalisé maximal
-    - 📊 **Meilleur ratio** — score ÷ kWh/conversation le plus élevé, tous modèles confondus
+    - 🔬 **Le plus sobre par token** — consommation par token la plus faible parmi les modèles ayant au moins 55 % de score.
+      Il remplace l'ancien « meilleur ratio score / kWh », qui désignait un modèle très sobre mais peu performant (29 % de score).
+
+    **Pourquoi un seuil de 55 % ?** Le score moyen des modèles est d'environ 49,6 %. Un modèle à 55 % dépasse cette moyenne
+    de plus de 5 points, soit bien plus que l'incertitude de son score (intervalle de confiance médian de ±1,8 point pour
+    ces modèles) : même dans le pire cas, il reste au-dessus de la moyenne. On ne retient donc que des modèles
+    **nettement meilleurs que la moyenne**, sans être trop exigeant : 21 modèles sur 110 passent ce seuil (ligne jaune verticale).
+
+    **Pourquoi ce champion n'est-il pas sur la frontière de Pareto ?** La frontière est calculée sur les deux axes du graphique :
+    le score et l'énergie **par conversation**. Le 3e champion est choisi sur un autre critère, l'énergie **par token**.
+    Par conversation, *gemma-3-12b* est dépassé par *gemma-2-27b-it-q8* (meilleur score et conversations moins coûteuses) ;
+    par token, il est en revanche sur la frontière (aucun modèle ne fait mieux sur les deux critères à la fois).
+    Les deux critères ne disent pas la même chose : par conversation, on mesure le coût réel d'un échange,
+    qui dépend aussi de la longueur des réponses ; par token, on mesure l'efficience du modèle lui-même.
     """)
 
 st.markdown("""
 **Key insights**
 - 📐 La **frontière de Pareto** montre qu'aucun modèle unique ne domine sur tous les critères — le choix optimal dépend des priorités (qualité vs coût)
-- ⚡ Le meilleur compromis (*gemma-2-27b-it-q8* : 62 % pour 0,00007 kWh/conversation) approche le score du n°1 (*gemini-2.0-flash*, 64,7 %) pour près de 90 fois moins d'énergie
-- 📊 Le ratio score / kWh favorise les très petits modèles, même peu performants (*chocolatine* : 29 %) : il se lit avec le score, pas seul
+- ⚡ Le meilleur compromis (*gemma-2-27b-it-q8* : 62 % pour 0,07 Wh par conversation) approche le score du n°1 (*gemini-2.0-flash*, 64,7 %) pour près de 90 fois moins d'énergie
+- 🔬 Parmi les modèles de bonne qualité (≥ 55 %), *gemma-3-12b* est le plus sobre par token : un bon choix pour un usage à fort volume
 """)
 
 with st.expander("⚠️ Limites de cette analyse"):
@@ -680,6 +758,150 @@ with st.expander("⚠️ Limites de cette analyse"):
     - **Snapshot temporel** : les modèles évoluent continuellement — ce classement reflète leurs performances à la date de collecte des données
     - **Consommation estimée par token** : le `mwh_per_token` est calculé globalement par modèle, sans distinction selon le type de tâche ou la longueur des échanges
     """)
+
+st.divider()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SECTION 3 BIS — ESTIMÉ VS MESURÉ (ComparIA × AI Energy Score)
+# ══════════════════════════════════════════════════════════════════════════════
+st.header("🔬 Estimé vs mesuré : peut-on se fier aux estimations ?")
+st.markdown(
+    "ComparIA **estime** l'énergie de chaque modèle ; AI Energy Score la **mesure** sur un vrai GPU. "
+    "Si les estimations sont fiables, les deux sources doivent **classer les modèles dans le même ordre**."
+)
+
+
+def spearman(x, y):
+    """Corrélation de Spearman = corrélation de Pearson calculée sur les classements (rangs)."""
+    return x.rank().corr(y.rank())
+
+
+exact = comparable[comparable["match_type"] == "exact"]
+rho_all = spearman(comparable["comparia_wh_per_req"], comparable["gpu_energy_wh"])
+rho_exact = spearman(exact["comparia_wh_per_req"], exact["gpu_energy_wh"])
+
+MATCH_COLORS = {"exact": "#2A9D8F", "nom_different": "#E9C46A", "version_base": "#E76F51"}
+MATCH_LABELS = {
+    "exact": "Nom identique",
+    "nom_different": "Même modèle, nom différent",
+    "version_base": "Mesure sur la version de base",
+}
+
+col_scatter, col_rho = st.columns([7, 3])
+
+with col_scatter:
+    fig_evm = go.Figure()
+    for match_type, group in comparable.groupby("match_type"):
+        fig_evm.add_trace(go.Scatter(
+            x=group["gpu_energy_wh"], y=group["comparia_wh_per_req"],
+            mode="markers+text",
+            text=group["model"], textposition="top center", textfont=dict(size=9),
+            marker=dict(size=12, color=MATCH_COLORS.get(match_type, "#AAAAAA"), line=dict(color="white", width=1)),
+            name=MATCH_LABELS.get(match_type, match_type),
+            hovertemplate="<b>%{text}</b><br>Mesuré : %{x:.3f} Wh<br>Estimé : %{y:.3f} Wh<extra></extra>",
+        ))
+    fig_evm.update_layout(
+        title=f"Énergie estimée vs mesurée — génération de texte ({len(comparable)} modèles)"
+              "<br><sup>échelles logarithmiques · Wh par requête</sup>",
+        xaxis=dict(title="Énergie MESURÉE — AI Energy Score (Wh / requête, GPU H100)", type="log"),
+        yaxis=dict(title="Énergie ESTIMÉE — ComparIA (Wh / requête)", type="log"),
+        height=480,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        legend=dict(orientation="h", yanchor="bottom", y=-0.35),
+    )
+    st.plotly_chart(fig_evm, use_container_width=True)
+
+with col_rho:
+    st.metric("Corrélation de Spearman", f"{rho_all:.2f}")
+    st.caption(f"{len(comparable)} modèles présents dans les deux sources")
+    st.metric("Sur les correspondances exactes", f"{rho_exact:.2f}")
+    st.caption(f"{len(exact)} modèles portant le même nom dans les deux sources")
+    st.markdown(
+        "**Lecture** : **+1** = les deux sources classent les modèles exactement dans le même ordre ; "
+        "**0** = aucun lien entre les deux classements."
+    )
+
+# Tableau détaillé : un modèle par ligne, trié du plus sobre au plus gourmand SELON LA MESURE.
+# Si l'estimation est fiable, la colonne « Estimé » doit elle aussi grandir de haut en bas.
+LINK_LABELS = {
+    "exact": "✅ Même modèle, même nom",
+    "nom_different": "✅ Même modèle, nom différent",
+    "version_base": "⚠️ Même modèle, autre version",
+}
+
+
+def gap_cell(ratio):
+    """Écart estimé ÷ mesuré. On utilise un rapport plutôt qu'une différence : les valeurs vont
+    de 0,02 à 1,3 Wh, et une différence de 0,03 Wh serait énorme pour un petit modèle mais
+    négligeable pour un gros. Vert : moins d'un facteur 3 d'écart ; rouge : plus d'un facteur 3."""
+    text = f"× {ratio:.1f} (surestimé)" if ratio >= 1 else f"÷ {1 / ratio:.1f} (sous-estimé)"
+    color, background = ("#1B7F4B", "#E6F4EA") if 1 / 3 <= ratio <= 3 else ("#C0392B", "#FDECEA")
+    return f'<td style="padding:6px;color:{color};background:{background};font-weight:600;">{text}</td>'
+
+
+_th = 'style="padding:6px;text-align:left;border-bottom:2px solid #ddd;font-size:12px;"'
+_rows = ""
+for _, row in comparable.sort_values("gpu_energy_wh").iterrows():
+    ratio = row["comparia_wh_per_req"] / row["gpu_energy_wh"]
+    _rows += (
+        '<tr style="border-bottom:1px solid #f0f0f0;">'
+        f'<td style="padding:6px;">{logo_img_tag(row["provider"], size=22)} '
+        f'<span style="font-size:11px;color:#666;">{row["provider"]}</span></td>'
+        f'<td style="padding:6px;font-weight:600;">{row["model"]}</td>'
+        f'<td style="padding:6px;font-size:12px;">{LINK_LABELS.get(row["match_type"], row["match_type"])}</td>'
+        f'<td style="padding:6px;">{row["gpu_energy_wh"]:.3f}</td>'
+        f'<td style="padding:6px;">{row["comparia_wh_per_req"]:.3f}</td>'
+        f'{gap_cell(ratio)}'
+        '</tr>'
+    )
+st.markdown(
+    '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    f'<tr><th {_th}>Fournisseur</th><th {_th}>Modèle</th><th {_th}>Lien entre les sources</th>'
+    f'<th {_th}>Mesuré — AI Energy Score<br>(Wh / requête)</th>'
+    f'<th {_th}>Estimé — ComparIA<br>(Wh / requête)</th>'
+    f'<th {_th}>Écart estimé / mesuré</th></tr>'
+    f'{_rows}</table>',
+    unsafe_allow_html=True,
+)
+st.caption(
+    "Lecture : le tableau est trié par la mesure ; si l'estimation est fiable, la colonne « Estimé » grandit aussi. "
+    "« Lien entre les sources » indique la qualité de l'appariement : ⚠️ = même modèle, mais pas la même version "
+    "dans les deux sources (voir la méthodologie) ; la comparaison est alors approximative. "
+    "« Écart » : combien de fois l'estimation est au-dessus (×) ou en dessous (÷) de la mesure ; "
+    "vert = moins d'un facteur 3, rouge = plus d'un facteur 3."
+)
+
+with st.expander("📐 Méthodologie — Estimé vs mesuré", expanded=False):
+    st.markdown("""
+    - Les modèles des deux sources sont reliés par une **table de correspondance** écrite à la main
+      (`references/model_mapping.csv`), car leurs noms diffèrent (`gemma-3-27b` ↔ `google/gemma-3-27b-pt`).
+    - On compare **à tâche égale** (génération de texte) et dans la **même unité** (Wh par requête) :
+      l'estimation de ComparIA en kWh par requête est convertie en Wh.
+    - Les deux sources n'ont ni les mêmes conditions (vraies conversations contre 1 000 requêtes de test sur un GPU H100)
+      ni les mêmes réglages : seul **l'ordre** des modèles est comparable. D'où la **corrélation de Spearman**,
+      une corrélation de Pearson calculée sur les classements plutôt que sur les valeurs.
+    - **« ⚠️ Même modèle, autre version »** (5 modèles) : un modèle existe souvent en deux versions. La **version de base**
+      est le modèle tel qu'il sort de son premier entraînement (il sait compléter un texte) ; la **version conversationnelle**
+      (« instruct ») est ce même modèle, réentraîné pour dialoguer. Les deux ont la même taille et la même architecture,
+      donc le même coût par token : ce n'est pas un autre modèle. Mais AI Energy Score a mesuré la version de base, alors que
+      ComparIA utilise la version conversationnelle, qui ne répond pas forcément avec la même longueur. D'où le ⚠️ :
+      la comparaison est approximative. Le calcul refait sur les seules correspondances « même nom » (ρ = 1,00)
+      vérifie que cette approximation ne change pas la conclusion.
+    - **Colonne « Écart »** : on compare l'estimation à la mesure par un **rapport** (« × 1,9 » = l'estimation est
+      1,9 fois plus élevée que la mesure ; « ÷ 7,5 » = 7,5 fois plus basse), et non par une différence. Les valeurs vont
+      de 0,02 à 1,3 Wh : une différence de 0,03 Wh serait énorme pour un petit modèle et négligeable pour un gros,
+      alors qu'un rapport se lit de la même façon pour tous. **Vert** : moins d'un facteur 3 d'écart, l'estimation est
+      du bon ordre de grandeur ; **rouge** : plus d'un facteur 3, l'estimation s'écarte nettement de la mesure.
+    """)
+
+st.markdown(f"""
+**Key insights**
+- ✅ Avec ρ = {rho_all:.2f}, ComparIA classe les modèles presque dans le même ordre que les mesures réelles : ses estimations sont **fiables pour comparer** des modèles entre eux, pas pour connaître leur consommation exacte
+- 🎯 Sur les seules correspondances exactes, ρ = {rho_exact:.2f} : l'approximation « version de base / instruct » ne change pas la conclusion
+- 🔎 Deux points s'écartent : *mixtral-8x7b* (mesuré sur sa version de base, sans doute plus bavarde) et *deepseek-r1-distill-llama-70b* (modèle de raisonnement, très verbeux en conversation réelle)
+- ⚠️ Seuls {len(comparable)} modèles, tous open-weight, peuvent être comparés : les modèles propriétaires ne sont pas mesurables
+""")
 
 st.divider()
 
@@ -707,8 +929,8 @@ def fmt_iphone(kwh):
 
 CRITERIA_CAT = {
     "🔬 Par token généré":  ("mwh_per_token",   "mWh / token"),
-    "💬 Par conversation":  ("avg_kwh",          "kWh / conversation"),
-    "📨 Par requête":       ("avg_kwh_per_req",  "kWh / requête"),
+    "💬 Par conversation":  ("wh_conv",          "Wh / conversation"),
+    "📨 Par requête":       ("wh_req",           "Wh / requête"),
 }
 
 with col_cat:
@@ -741,7 +963,7 @@ with col_cat:
         customdata=cat_data[["provider", "nb_conv_cat"]].values,
         hovertemplate=(
             "<b>%{text}</b><br>"
-            f"{cat_label} : %{{x:.5f}}<br>"
+            f"{cat_label} : %{{x:.3f}}<br>"
             "Provider : %{customdata[0]}<br>"
             "Conversations : %{customdata[1]:,}<extra></extra>"
         ),
@@ -755,7 +977,7 @@ with col_cat:
         val = row[cat_col]
         fig_cat.add_annotation(
             x=val * 1.02, y=i,
-            text=f"{val:.5f}",
+            text=fmt_value(val),
             xanchor="left", yanchor="middle",
             showarrow=False, font=dict(size=9),
             xref="x", yref="y",
@@ -848,6 +1070,22 @@ with col_energy:
         f'</div>',
         unsafe_allow_html=True,
     )
+    # Mesure réelle d'AI Energy Score, quand le modèle a été mesuré (modèles open-weight seulement)
+    measured = comparable[comparable["model"] == selected_model]
+    if not measured.empty:
+        wh_measured = float(measured["gpu_energy_wh"].iloc[0])
+        st.markdown(
+            f'<div style="{_card_e}background:#f7f3ff;border:1px solid #7B61FF;">'
+            f'<div style="font-size:28px;">🔬</div>'
+            f'<div style="font-size:11px;color:#888;margin:4px 0;">MESURÉ PAR AI ENERGY SCORE (GPU H100)</div>'
+            f'<div style="font-size:18px;font-weight:700;color:#7B61FF;">{wh_measured:.3f} Wh / requête</div>'
+            f'<div style="font-size:11px;color:#888;margin-top:4px;">estimé par ComparIA : {kwh * 1000:.3f} Wh / requête</div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption(f"🔬 Pas de mesure AI Energy Score pour ce modèle : seuls {len(comparable)} modèles open-weight ont été mesurés.")
+
     with st.expander("📐 Méthodologie — Coût énergétique par requête", expanded=False):
         st.markdown("""
         La consommation affichée est `avg_kwh_per_req` — la moyenne du kWh consommé par requête,
