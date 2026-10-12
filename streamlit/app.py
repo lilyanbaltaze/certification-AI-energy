@@ -268,8 +268,11 @@ with _info_right.expander("ℹ️ Qu'est-ce qu'AI Energy Score ?", expanded=Fals
     - un même processeur graphique (**GPU NVIDIA H100**), une requête à la fois ;
     - **1 000 requêtes** par tâche (génération de texte, raisonnement…) ;
     - seule l'énergie du GPU est comptée, exprimée en **Wh par requête** ;
-    - une note de **1 à 5 étoiles**, relative à la classe de taille du modèle
-      (A : moins de 20 milliards de paramètres, B : de 20 à 66, C : plus de 66).
+    - une note de **1 à 5 étoiles** qui exprime l'efficacité énergétique **relative** : le modèle est comparé aux autres
+      modèles de la même tâche et, en génération de texte, de la même classe de taille (A : moins de 20 milliards de
+      paramètres, B : de 20 à 66, C : plus de 66). L'écart entre la consommation la plus faible et la plus forte est
+      découpé en cinq tranches égales : 5 étoiles pour la plus sobre, 1 étoile pour la plus gourmande. Les étoiles sont
+      recalculées à chaque mise à jour du classement : ce dashboard utilise donc la mesure en Wh, stable.
 
     Seuls les modèles **open-weight** (dont les poids sont publics) peuvent être mesurés : GPT, Claude ou Gemini n'y figurent pas.
     Ce dashboard s'en sert pour **vérifier les estimations de ComparIA** sur les {len(comparable)} modèles présents

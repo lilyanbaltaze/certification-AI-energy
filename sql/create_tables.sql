@@ -75,7 +75,7 @@ CREATE TABLE ai_energy.energy_measures (
     task             STRING NOT NULL,   -- text_generation ou reasoning, à bien différencier
     reasoning_level  STRING NOT NULL,   -- effort de raisonnement réglé pour le test : low / medium / high (modèles gpt-oss), ou "default" (réglage par défaut)
     gpu_energy_wh    FLOAT64 NOT NULL,  -- Wh GPU pour UNE requête (le leaderboard affiche cette valeur × 1000 = Wh pour 1 000 requêtes)
-    energy_score     INT64 NOT NULL,    -- 1 à 5, les étoiles du tableau, relatives à la classe de taille (ne pas comparer entre classes)
+    energy_score     INT64 NOT NULL,    -- étoiles 1 à 5 : efficacité relative à la tâche et à la classe de taille, recalculée à chaque mise à jour
     size_class       STRING NOT NULL,   -- A < 20B, B 20–66B, C > 66B
     test_date        DATE NOT NULL,
     model_name       STRING,            -- modèle ComparIA correspondant (table de correspondance)
