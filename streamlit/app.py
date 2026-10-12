@@ -1,11 +1,14 @@
 import base64
+import os
 import urllib.request
 from io import BytesIO
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import requests
 import streamlit as st
+from dotenv import load_dotenv
 from pathlib import Path
 from PIL import Image
 
@@ -17,7 +20,11 @@ st.set_page_config(
 )
 
 # ── Constants ─────────────────────────────────────────────────────────────────
-DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
+# Le dashboard ne lit plus de fichiers : il interroge l'API (compétence C5)
+ROOT_DIR = Path(__file__).resolve().parents[1]
+load_dotenv(ROOT_DIR / ".env")
+API_URL = os.getenv("API_URL", "http://localhost:8000")
+API_HEADERS = {"X-API-Key": os.getenv("API_KEY")}
 
 PROVIDER_COLORS = {
     "Google": "#4285F4", "DeepSeek": "#FF6B35", "Mistral": "#FA0F00",
@@ -96,22 +103,29 @@ def logo_img_tag(provider: str, size: int = 24) -> str:
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
+def fetch(endpoint):
+    """Demande un tableau à l'API et le renvoie sous forme de DataFrame."""
+    response = requests.get(f"{API_URL}{endpoint}", headers=API_HEADERS, timeout=60)
+    response.raise_for_status()  # erreur claire si l'API est arrêtée ou si la clé est fausse
+    return pd.DataFrame(response.json())
+
+
 @st.cache_data
 def load_data():
     classement = (
-        pd.read_csv(DATA_DIR / "classement_score_ajuste.csv")
+        fetch("/ranking")
         .sort_values("score", ascending=False)
         .reset_index(drop=True)
     )
     classement["provider"] = classement["model"].apply(get_provider)
 
     energy_g = (
-        pd.read_csv(DATA_DIR / "energy_global.csv")
+        fetch("/energy")
         .query("avg_kwh >= 0.00001")
     )
     energy_g["provider"] = energy_g["model"].apply(get_provider)
 
-    ranking_cat = pd.read_csv(DATA_DIR / "ranking_per_cat.csv")
+    ranking_cat = fetch("/categories")
     ranking_cat["provider"] = ranking_cat["model"].apply(get_provider)
 
     merged = classement.merge(

@@ -72,10 +72,10 @@ CREATE TABLE ai_energy.votes (
 -- avec l'attribut de l'association, match_type. Vide si le modèle n'existe pas dans ComparIA.
 CREATE TABLE ai_energy.energy_measures (
     hf_model_id      STRING NOT NULL,   -- identifiant Hugging Face (organisation/nom)
-    task             STRING NOT NULL,   -- text_generation ou reasoning : ne jamais mélanger
-    reasoning_level  STRING NOT NULL,   -- low / medium / high, ou "default"
-    gpu_energy_wh    FLOAT64 NOT NULL,  -- Wh GPU par requête (H100, lot de 1)
-    energy_score     INT64 NOT NULL,    -- 1 à 5, relatif à la classe de taille
+    task             STRING NOT NULL,   -- text_generation ou reasoning, à bien différencier
+    reasoning_level  STRING NOT NULL,   -- effort de raisonnement réglé pour le test : low / medium / high (modèles gpt-oss), ou "default" (réglage par défaut)
+    gpu_energy_wh    FLOAT64 NOT NULL,  -- Wh GPU pour UNE requête (le leaderboard affiche cette valeur × 1000 = Wh pour 1 000 requêtes)
+    energy_score     INT64 NOT NULL,    -- 1 à 5, les étoiles du tableau, relatives à la classe de taille (ne pas comparer entre classes)
     size_class       STRING NOT NULL,   -- A < 20B, B 20–66B, C > 66B
     test_date        DATE NOT NULL,
     model_name       STRING,            -- modèle ComparIA correspondant (table de correspondance)
