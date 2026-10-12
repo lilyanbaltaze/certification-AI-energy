@@ -175,7 +175,8 @@ logo_b64 = load_logos()
 # TITRE
 # ══════════════════════════════════════════════════════════════════════════════
 st.title("Comparaison entre différents modèles d'IA")
-st.caption("Source : ComparIA — votes et conversations en duel")
+st.caption("Source : ComparIA (ministère de la Culture) — votes et conversations en duel, lus via l'API du projet. "
+           "Textes mis à jour sur la collecte du 12/10/2026 (conversations du 01/10/2024 au 18/05/2026).")
 
 with st.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
     st.markdown("""
@@ -196,7 +197,7 @@ with st.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
         st.markdown(
             f'<div style="{_card_info}background:#EEF2FF;border:1px solid #C7D2FE;">'
             '<div style="font-size:22px;font-weight:700;color:#4F46E5;">/conversations</div>'
-            '<div style="font-size:13px;color:#555;">Le prompt de l\'utilisateur et les réponses des deux modèles — chaque ligne est un duel analysé</div>'
+            '<div style="font-size:13px;color:#555;">Chaque duel : modèles, énergie estimée, tokens, catégories. Le texte des échanges n\'est pas collecté (RGPD)</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -204,7 +205,7 @@ with st.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
         st.markdown(
             f'<div style="{_card_info}background:#F0FDF4;border:1px solid #BBF7D0;">'
             '<div style="font-size:22px;font-weight:700;color:#16A34A;">/réactions</div>'
-            '<div style="font-size:13px;color:#555;">Les retours laissés sur chaque réponse individuelle d\'un modèle (utile, créatif, incorrect…)</div>'
+            '<div style="font-size:13px;color:#555;">Les retours sur chaque réponse (utile, créatif, incorrect…) — non utilisés par ce projet</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -219,8 +220,8 @@ with st.expander("ℹ️ Qu'est-ce que ComparIA ?", expanded=False):
 
     st.markdown("---")
     st.markdown("""
-    💬 **+500 000 conversations** collectées depuis le lancement &nbsp;·&nbsp;
-    🗳️ **+171 000 votes** exprimés par les utilisateurs
+    💬 **410 016 conversations** &nbsp;·&nbsp; 🗳️ **149 209 votes** publiés par ComparIA
+    (du 01/10/2024 au 18/05/2026, avant nettoyage)
     """)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -281,7 +282,7 @@ with st.expander("📐 Méthodologie — Score ajusté", expanded=False):
     st.markdown("""
     Chaque duel oppose deux modèles sur une même conversation. Plutôt qu'un simple win rate,
     on attribue **1 pt** pour une victoire, **0.5 pt** pour une égalité et **0 pt** pour une défaite —
-    ce qui intègre les ~33 % de duels se terminant à égalité. Le score est la moyenne pondérée sur
+    ce qui intègre les ~32 % de duels se terminant à égalité. Le score est la moyenne pondérée sur
     l'ensemble des duels (min. 200 duels), avec un **intervalle de confiance à 95 %**.
     """)
 
@@ -371,8 +372,9 @@ st.plotly_chart(fig_score, use_container_width=True)
 st.markdown("""
 **Key insights**
 - 🥇 **gemini-2.0-flash** domine avec un score de ~65 % et un intervalle de confiance étroit grâce à plus de 6 000 duels
-- 🔵 **Google** est le provider le plus représenté dans le top 10, suivi de **Mistral** et **DeepSeek**
-- ⚖️ Les modèles au-delà du top 10 ont des scores très proches (57–59 %), rendant leur classement peu significatif sans les intervalles de confiance
+- 🔵 **Google** est le provider le plus représenté dans le top 10 (6 modèles), devant **DeepSeek** et **Mistral** (2 chacun)
+- 🔧 La correction de 9 182 votes au champ `both_equal` vide fait remonter des modèles de fin 2024 (*gemma-2-27b-it-q8* 3e, *gemini-1.5-pro* 4e)
+- ⚖️ Du 11e au 30e rang, les scores sont très proches (54–58 %) avec des intervalles d'environ ±2,5 pts : leur ordre exact est peu significatif
 """)
 
 st.divider()
@@ -384,10 +386,11 @@ st.header("⚡ Consommation énergétique des modèles")
 
 with st.expander("📐 Méthodologie — Consommation énergétique", expanded=False):
     st.markdown("""
-    La colonne `total_conv_X_kwh` de chaque conversation mesure l'énergie totale consommée
-    (infrastructure incluse). On calcule la moyenne par modèle et on la normalise par le nombre
-    de tours (`avg_turns`) pour obtenir une **consommation par requête** comparable à d'autres usages numériques.
-    La consommation par token est calculée en divisant le kWh total par le nombre de tokens générés.
+    La colonne `total_conv_X_kwh` est une **estimation** de ComparIA, pas une mesure : elle vaut le nombre de tokens
+    générés × un coefficient fixe propre à chaque modèle. On calcule la moyenne par modèle (réponses vides exclues)
+    et on la divise par le nombre moyen de tours (`avg_turns`) pour obtenir une **consommation par requête**
+    comparable à d'autres usages numériques. La consommation par token (somme des kWh ÷ somme des tokens)
+    est donc le coefficient de ComparIA lui-même.
     """)
 
 CRITERIA = {
@@ -475,9 +478,10 @@ with col_right:
 
 st.markdown("""
 **Key insights**
-- 💡 Les modèles **Gemma** (Google) et **GPT-4o-mini** sont les plus économes par token — leur architecture compacte explique cette efficience
-- 📊 La consommation **par conversation** avantage les modèles concis ; la vue **par token** révèle l'efficience architecturale réelle
-- ⚠️ Les modèles de raisonnement (*deepseek-r1*, *kimi-k2-thinking*) consomment 3–5× plus par conversation malgré des scores proches de la moyenne
+- 💡 Les plus sobres **par token** (~0,08 mWh) sont de petits modèles ou des modèles à experts : *lfm2*, *gpt-oss-20b*, *qwen3-30b-a3b*, *gpt-5-nano*, *gemma-3-4b*
+- 📊 **Par conversation**, l'écart est énorme : de 0,00003 kWh (*chocolatine*) à 0,15 kWh (*grok-4.20*), pour une médiane de 0,0009 kWh
+- ⚠️ Les modèles de raisonnement consomment beaucoup plus par conversation (*deepseek-r1* 5×, *kimi-k2-thinking* 8× la médiane) pour des scores proches de la moyenne (54 % et 51 %, moyenne 49 %)
+- 🔎 Ces valeurs sont des **estimations** de ComparIA (tokens × coefficient par modèle) : le classement par token reflète ce coefficient, pas une mesure
 """)
 
 st.divider()
@@ -559,9 +563,10 @@ with col_chart:
             hovertemplate=f"<b>%{{customdata[0]}}</b><br>{label}<br>Score : %{{x:.1f}}%<br>kWh : %{{y:.5f}}<extra></extra>",
         ))
 
-    # Ligne verticale : gemini-2.0-flash (meilleur score, pas de données énergie)
+    # Ligne verticale : gemini-2.0-flash (meilleur score), affichée seulement s'il n'a pas de données énergie.
+    # Sur l'échantillon du notebook il n'en avait pas ; sur les données complètes il en a, et il figure dans le graphique.
     _g2_score = classement.loc[classement["model"] == "gemini-2.0-flash", "score"]
-    if not _g2_score.empty:
+    if not _g2_score.empty and "gemini-2.0-flash" not in set(merged["model"]):
         _g2_score_val = float(_g2_score.iloc[0])
         fig_pareto.add_vline(
             x=_g2_score_val,
@@ -662,13 +667,14 @@ with st.expander("📐 Méthodologie — Synthèse Pareto", expanded=False):
 st.markdown("""
 **Key insights**
 - 📐 La **frontière de Pareto** montre qu'aucun modèle unique ne domine sur tous les critères — le choix optimal dépend des priorités (qualité vs coût)
-- ⚡ Le champion **qualité/énergie** offre un score compétitif pour une fraction de la consommation des modèles frontières
-- 🔬 Le modèle le plus efficace **par token** présente une architecture légère — idéal pour des usages à volume élevé
+- ⚡ Le meilleur compromis (*gemma-2-27b-it-q8* : 62 % pour 0,00007 kWh/conversation) approche le score du n°1 (*gemini-2.0-flash*, 64,7 %) pour près de 90 fois moins d'énergie
+- 📊 Le ratio score / kWh favorise les très petits modèles, même peu performants (*chocolatine* : 29 %) : il se lit avec le score, pas seul
 """)
 
 with st.expander("⚠️ Limites de cette analyse"):
     st.markdown("""
-    - **Données énergétiques partielles** : seulement 43 modèles disposent de données de consommation sur les 104 du classement — des modèles clés comme *gemini-2.0-flash* (pourtant n°1 du score) n'ont pas de données énergie et sont exclus du graphique Pareto
+    - **Énergie estimée, pas mesurée** : ComparIA calcule kWh = tokens × coefficient par modèle ; la comparaison avec des mesures réelles (AI Energy Score) n'est possible que pour 11 modèles open-weight
+    - **Données énergétiques presque complètes** : 112 modèles ont des données de consommation ; 4 modèles de 2024 n'en ont aucune (*c4ai-command-r-08-2024*, *ministral-8b-instruct-2410*, *mistral-large-2411*, *qwen2.5-coder-32b-instruct*)
     - **Biais de sélection** : seuls les modèles avec ≥ 200 duels sont inclus dans le classement — les modèles récents peuvent être sous-représentés
     - **Qualité subjective** : le score est basé sur des préférences humaines, qui peuvent varier selon la langue, la culture et le contexte des conversations
     - **Snapshot temporel** : les modèles évoluent continuellement — ce classement reflète leurs performances à la date de collecte des données
@@ -797,14 +803,15 @@ with col_cat:
         Pour chaque catégorie, on retient uniquement les modèles ayant participé à **au moins 30 conversations**
         afin d'assurer une représentativité statistique minimale.
 
-        La métrique utilisée est le **mWh par token généré** (`mwh_per_token`), calculée globalement par modèle
-        depuis `efficiency.csv` — elle mesure l'efficience architecturale indépendamment de la verbosité.
-        Le top 5 correspond aux modèles consommant le moins d'énergie par token sur la catégorie sélectionnée.
+        La métrique par défaut est le **mWh par token généré** (`mwh_per_token`), calculée globalement par modèle
+        (endpoint `/categories` de l'API). C'est le coefficient fixé par ComparIA pour chaque modèle : il est
+        **identique dans toutes les catégories**. Le top 5 montre donc quels modèles sobres sont présents
+        dans la catégorie sélectionnée, pas une consommation propre à cette catégorie.
         """)
     st.markdown("""
 **Key insights**
-- 🔬 Les modèles **Gemma** (Google) dominent la plupart des catégories en efficience par token grâce à leur architecture légère
-- 📂 L'efficience varie selon les catégories — les tâches à longues réponses (code, sciences) amplifient les écarts entre modèles
+- 🔬 Les mêmes modèles sobres reviennent partout : *lfm2-8b-a1b*, *gpt-oss-20b*, *qwen3-30b-a3b* et *phi-3.5-mini-instruct* sont dans le top 5 de 18 catégories sur 20
+- 📂 Le mWh/token d'un modèle ne change pas d'une catégorie à l'autre (coefficient ComparIA) : ce qui change, c'est quels modèles sont présents
 - ⚖️ Un modèle économe en tokens sur une catégorie peut être moins performant sur le score ajusté — l'efficience ne garantit pas la qualité
 """)
 
@@ -855,7 +862,7 @@ with col_energy:
         """)
     st.markdown("""
 **Key insights**
-- 💡 La majorité des modèles consomment **moins d'une minute** d'ampoule LED par requête — l'IA reste peu énergivore à l'échelle individuelle
-- 🔍 Les modèles les plus sobres représentent une fraction infime d'une recherche Google, tandis que les plus énergivores en consomment l'équivalent de plusieurs dizaines
-- 🔋 Aucun modèle ne dépasse quelques pourcents d'une recharge iPhone — la comparaison aide à contextualiser un coût difficilement perceptible en kWh
+- 💡 Pour le modèle médian, une requête équivaut à environ **4 minutes** d'ampoule LED ; un tiers des modèles reste sous la minute
+- 🔍 De 0,07 recherche Google (modèles les plus sobres) à plus de 300 (*grok-4.20*), pour une médiane d'environ 2 recherches
+- 🔋 Le modèle médian consomme environ 3 % d'une recharge iPhone par requête ; *grok-4.20* dépasse 4 recharges selon l'estimation de ComparIA (valeur extrême, à interpréter avec prudence)
 """)
