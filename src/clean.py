@@ -102,13 +102,13 @@ def clean_votes(votes):
     votes = votes[~corrupted].copy()
 
     # both_equal vide alors qu'un gagnant est renseigné (votes d'oct. à déc. 2024) :
-    # s'il y a un gagnant, ce n'est pas une égalité → on corrige en False.
+    # s'il y a un gagnant, ce n'est pas une égalité donc on corrige en False.
     # Sans ça, ces votes comptaient comme duels mais jamais comme victoires.
     to_fix = votes["both_equal"].isna() & votes["chosen_model_name"].notna()
     votes.loc[to_fix, "both_equal"] = False
     logging.info(f"votes : {to_fix.sum()} valeurs both_equal corrigées en False")
 
-    # Cas restant : ni gagnant ni égalité → le vote ne dit rien, on le supprime
+    # Cas restant : ni gagnant ni égalité : le vote ne dit rien, on le supprime
     unusable = votes["both_equal"].isna()
     logging.info(f"votes : {unusable.sum()} supprimés (ni gagnant ni égalité)")
     votes = votes[~unusable]

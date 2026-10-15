@@ -1,6 +1,8 @@
 -- Modèle physique de données (MPD) : couche silver dans BigQuery, dataset ai_energy.
 -- Traduction du MCD (docs/diagrammes/mcd.svg) : une table par entité,
 -- et la table conversation_categories pour l'association n-n APPARTENIR.
+-- Exception : l'entité CATEGORIE n'a qu'un libellé, elle n'a donc pas de table propre
+-- (le nom de la catégorie est stocké directement dans conversation_categories).
 --
 -- BigQuery accepte les clés primaires et étrangères, mais ne les VÉRIFIE PAS
 -- (« NOT ENFORCED ») : elles documentent les liens et aident l'optimiseur de requêtes.
